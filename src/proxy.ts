@@ -9,7 +9,12 @@ const ROLE_RANK: Record<string, number> = { USER: 0, EDITOR: 1, ADMIN: 2 };
  */
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  let token: Awaited<ReturnType<typeof getToken>> = null;
+  try {
+    token = process.env.NEXTAUTH_SECRET ? await getToken({ req, secret: process.env.NEXTAUTH_SECRET }) : null;
+  } catch {
+    token = null;
+  }
   const signedIn = Boolean(token?.id) && !token?.disabled;
 
   if ((pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) && !signedIn) {
@@ -21,12 +26,12 @@ export async function proxy(req: NextRequest) {
   if (pathname.startsWith("/admin") && (ROLE_RANK[String(token?.role ?? "USER")] ?? 0) < ROLE_RANK.EDITOR) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
-  if ((pathname === "/login" || pathname === "/register") && signedIn) {
+  if ((pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") && signedIn) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/register", "/forgot-password"],
 };

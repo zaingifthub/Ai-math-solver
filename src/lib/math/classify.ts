@@ -7,6 +7,7 @@ import type { StatMeasure } from "./solvers/statistics";
 import type { ProbabilityRequest } from "./solvers/probability";
 import type { Shape } from "./solvers/geometry";
 import type { FunctionTask } from "./solvers/algebra";
+import { MathInputError } from "./types";
 
 export type Intent =
   | { type: "arithmetic"; expr: string }
@@ -85,6 +86,24 @@ function parseLimitPoint(raw: string): { at: string; side: "left" | "right" | "b
   }
   at = at.replace(/^\+?(inf|infinity|Infinity)$/i, "Infinity").replace(/^-(inf|infinity|Infinity)$/i, "-Infinity");
   return { at, side };
+}
+
+/** Explain why an input could not be parsed (unbalanced brackets, dangling operators…). */
+export function syntaxHint(s: string): string {
+  let depth = 0;
+  for (const ch of s) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth--;
+    if (depth < 0) return "There is a closing parenthesis without a matching opening one.";
+  }
+  if (depth > 0) return `There ${depth === 1 ? "is 1 unclosed parenthesis" : `are ${depth} unclosed parentheses`}.`;
+  if (/[+\-*/^=]\s*$/.test(s)) return "The problem ends with an operator — something is missing after it.";
+  if (/[+*/^]{2,}/.test(s.replace(/\*\*/g, "^"))) return "Two operators appear next to each other.";
+  return "Check the notation, e.g. 2x^2 + 3x - 5 = 0 or derivative of sin(x).";
+}
+
+function hasWords(s: string) {
+  return (s.match(/[a-zA-Z]{3,}/g) ?? []).length >= 2;
 }
 
 export function classify(raw: string): Intent {
@@ -277,7 +296,10 @@ export function classify(raw: string): Intent {
       return { type: "inequality", lhs: `((${mid}) - (${lo})) * ((${hi}) - (${mid}))`, op: strict ? ">" : ">=", rhs: "0", variable: v };
     }
     const { lhs, rhs, op } = rel[0];
-    if (!exprOK(lhs) || !exprOK(rhs)) return { type: "word", text: original };
+    if (!exprOK(lhs) || !exprOK(rhs)) {
+      if (hasWords(original)) return { type: "word", text: original };
+      throw new MathInputError(`We couldn't read that problem. ${syntaxHint(s)}`);
+    }
     const L = canon(lhs);
     const R = canon(rhs);
     const vars = [...new Set([...variablesOf(parseExpr(L)), ...variablesOf(parseExpr(R))])];
@@ -292,7 +314,11 @@ export function classify(raw: string): Intent {
   }
 
   // ── Plain expressions ──
-  if (!exprOK(s) || looksLikeWords(s)) return { type: "word", text: original };
+  if (looksLikeWords(s)) return { type: "word", text: original };
+  if (!exprOK(s)) {
+    if (hasWords(original)) return { type: "word", text: original };
+    throw new MathInputError(`We couldn't read that problem. ${syntaxHint(s)}`);
+  }
   const c = canon(s);
   const vars = variablesOf(parseExpr(c));
   if (vars.length === 0) return { type: "arithmetic", expr: c };

@@ -2,12 +2,14 @@ import "server-only";
 import type { UsageKind } from "@prisma/client";
 import { prisma } from "./db";
 import { getCurrentUser } from "./auth";
-import { getGuestId, hashValue, ApiError } from "./security";
+import { headers } from "next/headers";
+import { getGuestId, hashValue, ipFromHeaders, ApiError } from "./security";
 import { LIMITS, type PlanId } from "./plans";
 
 export interface Actor {
   userId: string | null;
   guestId: string;
+  ipHash: string | null;
   plan: PlanId | "GUEST";
   role: string;
   level: string;
@@ -16,9 +18,18 @@ export interface Actor {
 export async function getActor(): Promise<Actor> {
   const user = await getCurrentUser();
   const guestId = await getGuestId();
+  let ipHash: string | null = null;
+  try {
+    const h = await headers();
+    const ip = ipFromHeaders((n) => h.get(n));
+    ipHash = ip === "0.0.0.0" ? null : hashValue(`ip:${ip}`);
+  } catch {
+    /* outside a request scope */
+  }
   return {
     userId: user?.id ?? null,
     guestId,
+    ipHash,
     plan: user ? user.plan : "GUEST",
     role: user?.role ?? "GUEST",
     level: user?.level ?? "HIGH_SCHOOL",
@@ -32,6 +43,8 @@ const LIMIT_FIELD: Record<UsageKind, keyof (typeof LIMITS)["FREE"]> = {
   OCR: "imageScansPerDay",
   PRACTICE: "solvesPerDay",
 };
+
+const GUESTS_PER_IP = 5;
 
 function startOfDayUTC() {
   const d = new Date();
@@ -51,8 +64,14 @@ export async function checkQuota(actor: Actor, kind: UsageKind): Promise<QuotaSt
   const limit = Number(LIMITS[actor.plan][LIMIT_FIELD[kind]]);
   if (!process.env.DATABASE_URL) return { allowed: limit > 0, used: 0, limit };
   try {
+    const since = startOfDayUTC();
     const where = actor.userId ? { userId: actor.userId } : { guestId: actor.guestId };
-    const used = await prisma.usageEvent.count({ where: { ...where, kind, createdAt: { gte: startOfDayUTC() }, success: true } });
+    const used = await prisma.usageEvent.count({ where: { ...where, kind, createdAt: { gte: since }, success: true } });
+    if (!actor.userId && actor.ipHash && used < limit) {
+      // Clearing cookies must not reset the guest limit. Allow a few guests per network (schools, offices).
+      const perIp = await prisma.usageEvent.count({ where: { ipHash: actor.ipHash, userId: null, kind, createdAt: { gte: since }, success: true } });
+      if (perIp >= limit * GUESTS_PER_IP) return { allowed: false, used: Math.max(used, limit), limit };
+    }
     if (used < limit) return { allowed: true, used, limit };
     if (actor.userId) {
       // Spend a purchased credit when over the plan limit
@@ -93,6 +112,7 @@ export async function recordUsage(actor: Actor, kind: UsageKind, extra: { model?
       data: {
         userId: actor.userId,
         guestId: actor.userId ? null : actor.guestId,
+        ipHash: actor.userId ? null : actor.ipHash,
         kind,
         model: extra.model,
         inputTokens: extra.inputTokens ?? 0,

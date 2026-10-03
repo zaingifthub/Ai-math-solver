@@ -200,8 +200,8 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
     out = await dispatch(intent, opts);
   } catch (e) {
     if (e instanceof MathInputError) throw e;
-    // Unparseable symbolic input may still be a word problem
-    if (opts.translateWordProblem && intent.type !== "word") {
+    // Unparseable input that contains real words may still be a word problem
+    if (opts.translateWordProblem && intent.type !== "word" && (trimmed.match(/[a-zA-Z]{3,}/g) ?? []).length >= 3) {
       try {
         out = await dispatch({ type: "word", text: trimmed }, opts);
       } catch (inner) {

@@ -3,13 +3,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies, headers } from "next/headers";
 import { ZodError } from "zod";
+import { ipFromHeaders } from "./ip";
+
+export { ipFromHeaders };
 
 export const GUEST_COOKIE = "ams_gid";
 
 export function getClientIp(req?: NextRequest | Request): string {
-  const h = req?.headers;
-  const fwd = h?.get("x-forwarded-for") ?? "";
-  return fwd.split(",")[0]?.trim() || h?.get("x-real-ip") || "0.0.0.0";
+  return ipFromHeaders((n) => req?.headers.get(n));
 }
 
 export function hashValue(value: string): string {
@@ -47,15 +48,29 @@ export function jsonError(status: number, message: string, code?: string, extra?
   return NextResponse.json({ error: message, code, ...extra }, { status });
 }
 
+function isDatabaseUnavailable(e: unknown): boolean {
+  const err = e as { name?: string; code?: string; errorCode?: string };
+  return err?.name === "PrismaClientInitializationError" || ["P1000", "P1001", "P1002", "P1003", "P1017"].includes(err?.code ?? err?.errorCode ?? "");
+}
+
 /** Wrap a route handler with CSRF/origin checks and uniform error handling. */
-export function apiHandler<C = unknown>(handler: (req: NextRequest, ctx: C) => Promise<Response>, opts: { csrf?: boolean } = {}) {
+export function apiHandler<C = unknown>(handler: (req: NextRequest, ctx: C) => Promise<Response>, opts: { csrf?: boolean; maxBodyBytes?: number } = {}) {
+  const maxBody = opts.maxBodyBytes ?? 1024 * 1024;
   return async (req: NextRequest, ctx: C): Promise<Response> => {
     try {
       if (opts.csrf !== false && !isSameOrigin(req)) return jsonError(403, "Cross-site request blocked.", "CSRF");
+      // Reject oversized bodies before they are buffered into memory
+      const length = Number(req.headers.get("content-length") ?? 0);
+      if (length > maxBody) return jsonError(413, "Request is too large.", "PAYLOAD_TOO_LARGE");
       return await handler(req, ctx);
     } catch (e) {
       if (e instanceof ApiError) return jsonError(e.status, e.message, e.code, e.extra);
       if (e instanceof ZodError) return jsonError(400, e.issues[0]?.message ?? "Invalid input.", "VALIDATION", { issues: e.issues.slice(0, 5) });
+      if (e instanceof SyntaxError) return jsonError(400, "Malformed request body.", "BAD_JSON");
+      if (isDatabaseUnavailable(e)) {
+        console.error("[api] database unavailable", (e as Error).message);
+        return jsonError(503, "This feature is temporarily unavailable. Please try again shortly.", "DB_UNAVAILABLE");
+      }
       console.error("[api] unhandled error", e);
       return jsonError(500, "Something went wrong. Please try again.", "INTERNAL");
     }
@@ -78,8 +93,9 @@ export async function getGuestId(): Promise<string> {
 
 export async function requestMeta() {
   const h = await headers();
+  const ip = ipFromHeaders((n) => h.get(n));
   return {
-    ip: (h.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || h.get("x-real-ip") || undefined,
+    ip: ip === "0.0.0.0" ? undefined : ip,
     userAgent: h.get("user-agent")?.slice(0, 300) ?? undefined,
   };
 }

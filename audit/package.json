@@ -1,0 +1,17 @@
+{
+  "name": "ai-math-solver-audit",
+  "private": true,
+  "type": "module",
+  "description": "Production audit suite (kept separate so production installs don't download browsers).",
+  "scripts": {
+    "mock-ai": "node mock-anthropic.mjs",
+    "api": "node api-audit.mjs",
+    "pages": "node crawl-pages.mjs",
+    "private": "node crawl-private.mjs",
+    "e2e": "node e2e.mjs",
+    "all": "node api-audit.mjs && node crawl-pages.mjs && node crawl-private.mjs && node e2e.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}

@@ -7,7 +7,8 @@ import { tutorStream, type TutorMessage } from "@/lib/ai/tutor";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+// 60 s fits every Vercel plan; tutor replies stream, so long answers are delivered progressively.
+export const maxDuration = 60;
 
 const schema = z.object({
   conversationId: z.string().min(1).max(40).optional(),
@@ -29,6 +30,7 @@ export const POST = apiHandler(async (req) => {
 
   // Signed-in users get persistent conversations; guests send their (short) history.
   let conversationId = body.conversationId ?? null;
+  let createdConversation = false;
   let history: TutorMessage[] = [];
   if (actor.userId && process.env.DATABASE_URL) {
     if (conversationId) {
@@ -38,6 +40,7 @@ export const POST = apiHandler(async (req) => {
     } else {
       const conv = await prisma.tutorConversation.create({ data: { userId: actor.userId, title: body.message.slice(0, 80), level: level as "HIGH_SCHOOL" } });
       conversationId = conv.id;
+      createdConversation = true;
     }
     await prisma.tutorMessage.create({ data: { conversationId: conversationId!, role: "user", content: body.message } });
   } else {
@@ -70,6 +73,10 @@ export const POST = apiHandler(async (req) => {
         if (!abort.signal.aborted) {
           await recordUsage(actor, "TUTOR", { success: false });
           send("error", { error: describeAIError(e) });
+        }
+        // Don't leave behind a conversation that has no tutor reply
+        if (createdConversation && conversationId && !full.trim()) {
+          await prisma.tutorConversation.delete({ where: { id: conversationId } }).catch(() => undefined);
         }
       } finally {
         controller.close();

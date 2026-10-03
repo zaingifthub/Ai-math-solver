@@ -3,14 +3,18 @@
  * timeout, so pathological symbolic problems can never block the server.
  */
 import { Worker } from "node:worker_threads";
+import { createRequire } from "node:module";
 import { math, toStr, type MathNode } from "./mathjs";
 
 type CasOp = "integrate" | "limit" | "solve" | "solveSystem" | "factor" | "expand" | "simplify" | "partfrac" | "tex";
 
 const WORKER_SOURCE = `
-const { parentPort } = require('worker_threads');
+const { parentPort, workerData } = require('worker_threads');
 let nerdamer, S;
-try { nerdamer = require('nerdamer'); S = require('nerdamer/solve'); } catch (e) { nerdamer = null; }
+for (const base of [workerData && workerData.nerdamer, 'nerdamer']) {
+  if (!base) continue;
+  try { nerdamer = require(base); S = require(workerData && workerData.solve && base !== 'nerdamer' ? workerData.solve : 'nerdamer/solve'); break; } catch (e) { nerdamer = null; }
+}
 function run(op, a) {
   if (!nerdamer) throw new Error('CAS unavailable');
   switch (op) {
@@ -48,7 +52,7 @@ class CasWorker {
 
   private ensure(): Worker {
     if (this.worker) return this.worker;
-    const w = new Worker(WORKER_SOURCE, { eval: true });
+    const w = new Worker(WORKER_SOURCE, { eval: true, workerData: resolveNerdamer() });
     w.unref();
     w.on("message", (m: { id: number; ok: boolean; value?: string; error?: string }) => {
       const p = this.pending.get(m.id);
@@ -93,12 +97,66 @@ class CasWorker {
   }
 }
 
-const globalForCas = globalThis as unknown as { __casWorker?: CasWorker };
+/** Absolute module paths so the eval'd worker can load nerdamer regardless of the process cwd (serverless, standalone). */
+function resolveNerdamer(): { nerdamer?: string; solve?: string } {
+  for (const base of [process.cwd() + "/", import.meta.url]) {
+    try {
+      const req = createRequire(base);
+      return { nerdamer: req.resolve("nerdamer"), solve: req.resolve("nerdamer/solve") };
+    } catch {
+      /* try next */
+    }
+  }
+  return {};
+}
+
+type NerdamerModule = ((expr: string) => { toString(): string; toTeX(): string }) & { solve: (eq: string, v: string) => { toString(): string } };
+let inlineCas: { nerdamer: NerdamerModule; S: { solveSystem: (eqs: string[]) => { toString(): string } } } | null | undefined;
+
+/** Last-resort in-process execution when worker threads are unavailable on the host platform. */
+function runInline(op: CasOp, a: string[] | string[][]): string {
+  if (inlineCas === undefined) {
+    try {
+      const paths = resolveNerdamer();
+      const req = createRequire(process.cwd() + "/");
+      inlineCas = { nerdamer: req(paths.nerdamer ?? "nerdamer"), S: req(paths.solve ?? "nerdamer/solve") };
+    } catch {
+      inlineCas = null;
+    }
+  }
+  if (!inlineCas) throw new Error("CAS unavailable");
+  const { nerdamer, S } = inlineCas;
+  const x = a as string[];
+  switch (op) {
+    case "integrate": return nerdamer(`integrate(${x[0]},${x[1]})`).toString();
+    case "limit": return nerdamer(`limit(${x[0]},${x[1]},${x[2]})`).toString();
+    case "solve": return nerdamer.solve(x[0], x[1]).toString().trim().replace(/^\[|\]$/g, "").replace(/^\{|\}$/g, "");
+    case "solveSystem": return S.solveSystem((a as string[][])[0]).toString();
+    case "factor": return nerdamer(`factor(${x[0]})`).toString();
+    case "expand": return nerdamer(`expand(${x[0]})`).toString();
+    case "simplify": return nerdamer(`simplify(${x[0]})`).toString();
+    case "partfrac": return nerdamer(`partfrac(${x[0]},${x[1]})`).toString();
+    case "tex": return nerdamer(x[0]).toTeX();
+  }
+}
+
+const globalForCas = globalThis as unknown as { __casWorker?: CasWorker; __casInline?: boolean };
 const cas = (globalForCas.__casWorker ??= new CasWorker());
 
 async function call(op: CasOp, args: string[] | string[][], timeoutMs = 4000): Promise<string | null> {
+  if (!globalForCas.__casInline) {
+    try {
+      return await cas.call(op, args, timeoutMs);
+    } catch (e) {
+      const msg = (e as Error).message;
+      // Only fall back when the worker itself cannot run; timeouts/math errors are real results.
+      if (!/CAS unavailable|worker|Cannot find module|ERR_WORKER/i.test(msg)) return null;
+      console.warn("[cas] worker unavailable, using in-process CAS:", msg);
+      globalForCas.__casInline = true;
+    }
+  }
   try {
-    return await cas.call(op, args, timeoutMs);
+    return runInline(op, args);
   } catch {
     return null;
   }

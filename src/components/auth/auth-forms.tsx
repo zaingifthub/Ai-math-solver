@@ -80,7 +80,10 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           <Input id="email" name="email" type="email" autoComplete="email" required maxLength={254} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+          </div>
           <Input id="password" name="password" type="password" autoComplete="current-password" required maxLength={128} />
         </div>
         <Button type="submit" className="w-full" disabled={loading}>{loading && <Loader2 className="animate-spin" />} Log in</Button>

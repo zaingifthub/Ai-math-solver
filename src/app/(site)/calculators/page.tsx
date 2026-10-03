@@ -11,7 +11,7 @@ export const revalidate = 3600;
 
 export const metadata = buildMetadata({
   title: "Free Math Calculators with Steps — 30+ Online Tools",
-  description: "Free online math calculators with step-by-step solutions: derivative, integral, limit, quadratic, matrix, fraction, percentage, statistics, geometry, graphing and scientific calculators.",
+  description: "30+ free math calculators with step-by-step solutions: derivatives, integrals, quadratics, matrices, fractions, statistics, geometry and graphing.",
   path: "/calculators",
 });
 

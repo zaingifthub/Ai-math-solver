@@ -27,7 +27,12 @@ export const PATCH = apiHandler(async (req: NextRequest, ctx: Ctx) => {
   const user = await requireRole(def.role);
   const existing = await def.delegate().findUnique({ where });
   if (!existing) throw new ApiError(404, "Not found.", "NOT_FOUND");
-  let data = (def.schema as unknown as { partial: () => { parse: (x: unknown) => Record<string, unknown> } }).partial().parse(await req.json());
+  const body = (await req.json()) as Record<string, unknown>;
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new ApiError(400, "Invalid body.", "VALIDATION");
+  const parsed = (def.schema as unknown as { partial: () => { parse: (x: unknown) => Record<string, unknown> } }).partial().parse(body);
+  // .partial() keeps .default() values for missing keys — keep only the fields the client actually sent.
+  let data = Object.fromEntries(Object.entries(parsed).filter(([k]) => k in body));
+  if (Object.keys(data).length === 0) throw new ApiError(400, "Nothing to update.", "VALIDATION");
   if (def.prepare) data = def.prepare({ ...data, status: data.status ?? existing.status }, existing);
   try {
     const row = await def.delegate().update({ where, data });
