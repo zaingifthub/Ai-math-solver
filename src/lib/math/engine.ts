@@ -219,7 +219,7 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
     const topic = practiceTopicFor(out.category, out.topic);
     if (topic) {
       const p = generateProblem(topic, 2);
-      similar = { problem: `${p.instruction} $${p.prompt}$`, answer: p.answer.display };
+      similar = { problem: `${p.instruction} $${p.prompt}$`, answer: p.answer.display, input: p.solveInput };
     }
   }
   return {

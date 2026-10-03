@@ -110,7 +110,8 @@ const GENERATORS: Record<PracticeTopic, Gen> = {
   },
   systems: (r, d) => {
     const x = int(r, -6, 6), y = int(r, -6, 6);
-    let a = nz(r, -5, 5), b = nz(r, -5, 5), c = nz(r, -5, 5), e = nz(r, -5, 5);
+    let a = nz(r, -5, 5), b = nz(r, -5, 5), e = nz(r, -5, 5);
+    const c = nz(r, -5, 5);
     if (a * e - b * c === 0) { a += 1; e += d; }
     if (a * e - b * c === 0) { b += 2; }
     const term = (k: number, v: string, first: boolean) => `${first ? (k < 0 ? "-" : "") : k < 0 ? " - " : " + "}${Math.abs(k) === 1 ? "" : Math.abs(k)}${v}`;

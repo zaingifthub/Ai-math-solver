@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
+const isHttps = (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://");
 const gaEnabled = Boolean(process.env.NEXT_PUBLIC_GA_ID);
 
 const csp = [
@@ -16,7 +17,7 @@ const csp = [
   "form-action 'self' https://accounts.google.com https://checkout.stripe.com",
   "base-uri 'self'",
   "object-src 'none'",
-  ...(isProd ? ["upgrade-insecure-requests"] : []),
+  ...(isProd && isHttps ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [
@@ -26,7 +27,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(self)" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
+  ...(isProd && isHttps ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
 ];
 
 const nextConfig: NextConfig = {
@@ -48,7 +49,6 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
-      { source: "/_next/static/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },
   async redirects() {

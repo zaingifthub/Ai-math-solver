@@ -86,7 +86,7 @@ export interface SolveResult {
   explanation: string;
   verification: Verification;
   alternative?: { title: string; steps: Step[] };
-  similar?: { problem: string; answer: string };
+  similar?: { problem: string; answer: string; input?: string };
   graph?: GraphSpec;
   restrictions?: string[];
   warnings?: string[];

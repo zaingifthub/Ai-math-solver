@@ -22,7 +22,7 @@ const EXT: Record<ImageMime, string> = { "image/png": "png", "image/jpeg": "jpg"
 
 function uploadRoot() {
   // Serverless platforms only allow writes to /tmp
-  return process.env.VERCEL ? "/tmp/ams-uploads" : path.resolve(env.UPLOAD_DIR);
+  return process.env.VERCEL ? "/tmp/ams-uploads" : path.resolve(/* turbopackIgnore: true */ env.UPLOAD_DIR);
 }
 
 export async function validateImageFile(file: File): Promise<{ buffer: Buffer; mime: ImageMime }> {
@@ -38,9 +38,9 @@ export async function validateImageFile(file: File): Promise<{ buffer: Buffer; m
 export async function storeUpload(buffer: Buffer, mime: ImageMime, owner: { userId: string | null; guestId: string }) {
   const day = new Date().toISOString().slice(0, 10);
   const name = `${randomBytes(16).toString("hex")}.${EXT[mime]}`;
-  const dir = path.join(uploadRoot(), day);
+  const dir = path.join(/* turbopackIgnore: true */ uploadRoot(), day);
   await mkdir(dir, { recursive: true, mode: 0o700 });
-  await writeFile(path.join(dir, name), buffer, { mode: 0o600 });
+  await writeFile(path.join(/* turbopackIgnore: true */ dir, name), buffer, { mode: 0o600 });
   const storageKey = `${day}/${name}`;
   const sha256 = createHash("sha256").update(buffer).digest("hex");
   const expiresAt = new Date(Date.now() + env.UPLOAD_TTL_HOURS * 3600_000);
@@ -60,7 +60,7 @@ export async function cleanupUploads(): Promise<{ deleted: number; orphans: numb
   if (process.env.DATABASE_URL) {
     const expired = await prisma.upload.findMany({ where: { expiresAt: { lt: new Date() }, status: { not: "DELETED" } }, take: 1000 });
     for (const u of expired) {
-      await unlink(path.join(root, u.storageKey)).catch(() => undefined);
+      await unlink(path.join(/* turbopackIgnore: true */ root, u.storageKey)).catch(() => undefined);
       await prisma.upload.update({ where: { id: u.id }, data: { status: "DELETED" } });
       deleted++;
     }
@@ -69,9 +69,9 @@ export async function cleanupUploads(): Promise<{ deleted: number; orphans: numb
   const cutoff = Date.now() - env.UPLOAD_TTL_HOURS * 3600_000;
   try {
     for (const day of await readdir(root)) {
-      const dir = path.join(root, day);
+      const dir = path.join(/* turbopackIgnore: true */ root, day);
       for (const f of await readdir(dir)) {
-        const p = path.join(dir, f);
+        const p = path.join(/* turbopackIgnore: true */ dir, f);
         const st = await stat(p);
         if (st.mtimeMs < cutoff) {
           await unlink(p).catch(() => undefined);

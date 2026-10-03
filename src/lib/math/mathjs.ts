@@ -54,7 +54,8 @@ export function toTex(expr: string | MathNode): string {
       .replace(/\\mathrm\{([a-zA-Z])\}/g, "$1")
       .replace(/\\cdot\s*\\left\(/g, "\\left(")
       .replace(/(\d)\s*\\cdot\s*(?=[a-zA-Z{(]|\\(?!frac|cdot|left))/g, "$1")
-      .replace(/\{\s+/g, "{");
+      .replace(/\{\s+/g, "{")
+      .replace(/~/g, " ");
   } catch {
     return String(expr);
   }
