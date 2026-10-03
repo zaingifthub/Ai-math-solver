@@ -56,6 +56,8 @@ export async function runSolve(input: string, actor: Actor, opts: SolveRequestOp
         if (ai) {
           out.ai = ai.enhancement;
           await recordUsage(actor, "AI_EXPLAIN", { model: ai.usage.model, inputTokens: ai.usage.input, outputTokens: ai.usage.output });
+        } else {
+          out.aiError = "An AI explanation isn't available for this problem. The verified steps above are complete.";
         }
       } catch (e) {
         out.aiError = describeAIError(e);

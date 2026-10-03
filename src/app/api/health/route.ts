@@ -15,5 +15,5 @@ export async function GET() {
     }
   }
   const ok = db !== "error";
-  return NextResponse.json({ status: ok ? "ok" : "degraded", db, ai: features.ai, billing: features.stripe, time: new Date().toISOString() }, { status: ok ? 200 : 503 });
+  return NextResponse.json({ status: ok ? "ok" : "degraded", db, auth: features.auth, ai: features.ai, billing: features.stripe, email: Boolean(process.env.SMTP_URL), time: new Date().toISOString() }, { status: ok ? 200 : 503 });
 }

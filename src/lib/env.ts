@@ -22,6 +22,8 @@ const schema = z.object({
   STRIPE_PRICE_EDUCATION_MONTHLY: z.string().optional(),
   STRIPE_PRICE_EDUCATION_YEARLY: z.string().optional(),
   RATE_LIMIT_STORE: z.enum(["memory", "database"]).default("memory"),
+  SMTP_URL: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);
@@ -36,4 +38,5 @@ export const features = {
   google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
   stripe: Boolean(env.STRIPE_SECRET_KEY),
   database: Boolean(env.DATABASE_URL),
+  auth: Boolean(env.NEXTAUTH_SECRET) && Boolean(env.DATABASE_URL),
 };

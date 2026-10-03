@@ -14,8 +14,22 @@ interface SeoInput {
   absoluteTitle?: boolean;
 }
 
+const SUFFIX = ` | ${siteConfig.name}`;
+const MAX_TITLE = 65;
+const MAX_DESC = 160;
+
+/** Trim at a word boundary so search engines don't cut the snippet mid-word. */
+export function clampText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20)).replace(/[\s,;:—-]+$/, "")}…`;
+}
+
 /** Builds complete metadata: canonical URL, Open Graph, Twitter card and robots directives. */
-export function buildMetadata(i: SeoInput): Metadata {
+export function buildMetadata(input: SeoInput): Metadata {
+  // Drop the brand suffix when it would push the title past ~65 characters (Google truncates around 60–70).
+  const absolute = input.absoluteTitle || input.title.length + SUFFIX.length > MAX_TITLE;
+  const i = { ...input, title: absolute ? clampText(input.title, 70) : input.title, description: clampText(input.description, MAX_DESC), absoluteTitle: absolute };
   const url = absoluteUrl(i.path);
   const image = i.image ?? absoluteUrl(`/og?title=${encodeURIComponent(i.title)}`);
   return {

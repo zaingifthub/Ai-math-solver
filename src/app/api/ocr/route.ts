@@ -52,4 +52,4 @@ export const POST = apiHandler(async (req) => {
     needsReview: confidence < CONFIDENCE_THRESHOLD || Boolean(result.issues),
     issues: result.issues || null,
   });
-});
+}, { maxBodyBytes: 6 * 1024 * 1024 });

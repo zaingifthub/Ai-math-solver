@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Users, FileText, FolderTree, BookOpen, Calculator, HelpCircle, Search, Settings, CreditCard, Cpu, ScrollText, Files, ArrowLeft } from "lucide-react";
+import { ShieldCheck, BarChart3, Users, FileText, FolderTree, BookOpen, Calculator, HelpCircle, Search, Settings, CreditCard, Cpu, ScrollText, Files, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const GROUPS = [
@@ -18,7 +18,7 @@ const GROUPS = [
       { href: "/admin/content/faqs", label: "FAQs", icon: HelpCircle },
     ],
   },
-  { title: "System", admin: true, items: [{ href: "/admin/content/seo", label: "SEO overrides", icon: Search }, { href: "/admin/content/settings", label: "Settings", icon: Settings }, { href: "/admin/audit", label: "Audit log", icon: ScrollText }] },
+  { title: "System", admin: true, items: [{ href: "/admin/system", label: "Health & security", icon: ShieldCheck }, { href: "/admin/content/seo", label: "SEO overrides", icon: Search }, { href: "/admin/content/settings", label: "Settings", icon: Settings }, { href: "/admin/audit", label: "Audit log", icon: ScrollText }] },
 ];
 
 export function AdminNav({ isAdmin }: { isAdmin: boolean }) {

@@ -61,6 +61,7 @@ nano .env
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | – | Google login. Redirect URI: `https://yourdomain.com/api/auth/callback/google` |
 | `UPLOAD_DIR` | – | Default `./storage/uploads` (use an absolute path, e.g. `/var/www/ai-math-solver/storage/uploads`) |
 | `CRON_SECRET` | ✅ | Random string for the cleanup endpoint |
+| `SMTP_URL` / `EMAIL_FROM` | recommended | Password-reset emails. Hostinger mail: `smtps://you%40yourdomain.com:PASSWORD@smtp.hostinger.com:465` |
 | `STRIPE_*`, `NEXT_PUBLIC_STRIPE_ENABLED` | – | Billing (see below) |
 | `RATE_LIMIT_STORE` | – | `memory` (single process) or `database` (multiple processes/servers) |
 | `NEXT_PUBLIC_GA_ID` | – | Google Analytics 4 |
@@ -142,7 +143,11 @@ crontab -e
 4. Enable the Customer Portal in Stripe settings.
 5. Rebuild & reload.
 
-## 12. Updating
+## 12. Post-deploy check
+
+Log in as admin and open **Admin → Health & security** (`/admin/system`). It verifies the database, migrations, secrets, HTTPS, AI, email, Stripe and upload storage, and lists locked or suspended accounts. Also check `https://yourdomain.com/api/health`.
+
+## 13. Updating
 
 ```bash
 cd /var/www/ai-math-solver && ./deploy/deploy.sh

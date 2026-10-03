@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Keyboard } from "lucide-react";
 import { MathKeyboard, type KeyDef } from "./math-keyboard";
 import { Tex } from "@/components/math/tex";
@@ -24,6 +24,17 @@ export function MathInput({ value, onChange, onSubmit, placeholder, rows = 2, ke
   const ref = useRef<HTMLTextAreaElement>(null);
   const [kbOpen, setKbOpen] = useState(keyboardDefaultOpen);
   const [preview, setPreview] = useState<string | null>(null);
+  // Caret position to apply right after React commits the new value (before the next keystroke is handled)
+  const pendingCaret = useRef<{ value: string; pos: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const p = pendingCaret.current;
+    if (!el || !p || p.value !== value) return;
+    pendingCaret.current = null;
+    el.focus();
+    el.setSelectionRange(p.pos, p.pos);
+  }, [value]);
 
   useEffect(() => {
     if (!showPreview) return;
@@ -52,13 +63,8 @@ export function MathInput({ value, onChange, onSubmit, placeholder, rows = 2, ke
       text = text.slice(0, pos) + selected + text.slice(pos);
     }
     const next = value.slice(0, start) + text + value.slice(end);
+    pendingCaret.current = { value: next, pos: start + text.length - (selected ? 0 : caretBack) };
     onChange(next);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      const caret = start + text.length - (selected ? 0 : caretBack);
-      el.focus();
-      el.setSelectionRange(caret, caret);
-    });
   };
 
   const backspace = () => {
@@ -67,11 +73,9 @@ export function MathInput({ value, onChange, onSubmit, placeholder, rows = 2, ke
     const end = el?.selectionEnd ?? value.length;
     if (start === end && start === 0) return;
     const from = start === end ? start - 1 : start;
-    onChange(value.slice(0, from) + value.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(from, from);
-    });
+    const next = value.slice(0, from) + value.slice(end);
+    pendingCaret.current = { value: next, pos: from };
+    onChange(next);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

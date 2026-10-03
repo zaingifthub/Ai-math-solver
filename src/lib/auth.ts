@@ -10,7 +10,7 @@ import { prisma } from "./db";
 import { env, adminEmails, features } from "./env";
 import { verifyPassword, dummyVerify } from "./password";
 import { rateLimit, LIMIT_PRESETS } from "./rate-limit";
-import { ApiError } from "./security";
+import { ApiError, ipFromHeaders } from "./security";
 
 const MAX_FAILED_LOGINS = 5;
 const LOCK_MINUTES = 15;
@@ -44,7 +44,8 @@ export const authOptions: NextAuthOptions = {
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
-        const ip = (req?.headers?.["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? "unknown";
+        const hdrs = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
+        const ip = ipFromHeaders((n) => { const v = hdrs[n]; return Array.isArray(v) ? v.join(",") : v; });
         const rl = await rateLimit(`login:${ip}`, LIMIT_PRESETS.auth.limit, LIMIT_PRESETS.auth.windowMs);
         if (!rl.ok) throw new Error("TooManyAttempts");
         const user = await prisma.user.findUnique({ where: { email } });
@@ -107,6 +108,17 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
+    async linkAccount({ user, account }) {
+      if (account.provider !== "google" || !user.id) return;
+      const db = await prisma.user.findUnique({ where: { id: user.id }, select: { emailVerified: true, passwordHash: true } });
+      if (!db) return;
+      // Someone may have registered this email with a password before its owner signed in with Google
+      // (account pre-hijacking). Google proves ownership, so drop any password that was never verified.
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: db.emailVerified ?? new Date(), ...(db.passwordHash && !db.emailVerified ? { passwordHash: null, failedLogins: 0, lockedUntil: null } : {}) },
+      });
+    },
     async signIn({ user }) {
       if (!user?.id) return;
       const data: { lastLoginAt: Date; role?: Role } = { lastLoginAt: new Date() };

@@ -8,7 +8,7 @@ export const revalidate = 3600;
 
 export const metadata = buildMetadata({
   title: "Math Formulas — Algebra, Geometry, Trigonometry, Calculus & Statistics",
-  description: "A complete math formula library with explanations, variables, worked examples and related calculators: quadratic formula, Pythagorean theorem, derivative rules, statistics formulas and more.",
+  description: "Essential math formulas with explanations, variables, worked examples and calculators — from the quadratic formula to derivative rules and statistics.",
   path: "/math-formulas",
 });
 

@@ -11,5 +11,11 @@
 5. **Cron:** `vercel.json` schedules `/api/cron/cleanup` daily. Set `CRON_SECRET` in project settings — Vercel sends it automatically as a Bearer token.
 6. **Domains:** add your domain in Project → Settings → Domains and follow the DNS instructions. SSL is automatic.
 7. **Uploads:** on Vercel, photo uploads are written to the ephemeral `/tmp` directory only for the duration of processing (they are not needed afterwards). For persistent storage, swap `storeUpload()` in `src/lib/uploads.ts` for S3/R2/Vercel Blob.
-8. **Function duration:** `/api/tutor` streams for up to 300 s and `/api/solve`, `/api/ocr` up to 60 s (`maxDuration`); make sure your Vercel plan allows these limits.
+8. **Function duration:** `/api/solve`, `/api/ocr` and the streaming `/api/tutor` use `maxDuration = 60`, which works on every Vercel plan (including Hobby).
 9. **Stripe webhook:** `https://yourdomain.com/api/stripe/webhook`.
+10. **Password-reset email:** set `SMTP_URL` and `EMAIL_FROM` (any SMTP provider).
+11. **After deploying,** sign in as an admin and open **Admin → Health & security**: it lists anything still misconfigured.
+
+### Minimum variables for a preview
+
+`NEXTAUTH_SECRET` alone is enough to preview the public site (solver, calculators, graphing, formulas, blog, practice). Accounts, history and the admin panel additionally need `DATABASE_URL` (+ migrations); AI features need `ANTHROPIC_API_KEY`. Missing pieces degrade gracefully and are explained on the login page.

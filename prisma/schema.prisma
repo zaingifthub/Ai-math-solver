@@ -296,6 +296,8 @@ model UsageEvent {
   id           String    @id @default(cuid())
   userId       String?
   guestId      String?
+  /// Salted hash of the client IP (guests only) — limits quota resets by clearing cookies
+  ipHash       String?
   kind         UsageKind
   model        String?
   inputTokens  Int       @default(0)
@@ -308,6 +310,7 @@ model UsageEvent {
 
   @@index([userId, kind, createdAt])
   @@index([guestId, kind, createdAt])
+  @@index([ipHash, kind, createdAt])
   @@index([createdAt])
 }
 

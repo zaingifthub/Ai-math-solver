@@ -11,7 +11,7 @@ export interface PlanLimits {
 }
 
 export const LIMITS: Record<PlanId | GuestPlan, PlanLimits> = {
-  GUEST: { solvesPerDay: 15, aiExplanationsPerDay: 3, tutorMessagesPerDay: 0, imageScansPerDay: 1, historyDays: 0, practice: true },
+  GUEST: { solvesPerDay: 15, aiExplanationsPerDay: 3, tutorMessagesPerDay: 3, imageScansPerDay: 1, historyDays: 0, practice: true },
   FREE: { solvesPerDay: 50, aiExplanationsPerDay: 10, tutorMessagesPerDay: 15, imageScansPerDay: 5, historyDays: 30, practice: true },
   PREMIUM: { solvesPerDay: 2000, aiExplanationsPerDay: 500, tutorMessagesPerDay: 500, imageScansPerDay: 200, historyDays: 3650, practice: true },
   EDUCATION: { solvesPerDay: 5000, aiExplanationsPerDay: 1000, tutorMessagesPerDay: 1000, imageScansPerDay: 500, historyDays: 3650, practice: true },

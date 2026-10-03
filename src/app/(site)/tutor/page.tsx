@@ -6,7 +6,7 @@ import { features } from "@/lib/env";
 
 export const metadata = buildMetadata({
   title: "AI Math Tutor — Explanations, Hints & Practice",
-  description: "Chat with an AI math tutor that explains steps, gives hints without spoiling answers, shows alternative methods, checks your work and creates practice questions — verified by a math engine.",
+  description: "An AI math tutor that explains steps, gives hints without spoilers, shows other methods and checks your work — every calculation verified.",
   path: "/tutor",
 });
 
