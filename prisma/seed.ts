@@ -49,7 +49,7 @@ async function main() {
   }
   for (const f of FORMULAS) {
     const { slug, ...rest } = f;
-    await prisma.formula.upsert({ where: { slug }, create: { slug, ...rest, relatedCalculator: rest.relatedCalculator ?? null, variables: rest.variables, faqs: rest.faqs }, update: {} });
+    await prisma.formula.upsert({ where: { slug }, create: { slug, ...rest, relatedCalculator: rest.relatedCalculator ?? null, variables: JSON.parse(JSON.stringify(rest.variables)), faqs: JSON.parse(JSON.stringify(rest.faqs)) }, update: {} });
   }
   if ((await prisma.faq.count()) === 0) {
     await prisma.faq.createMany({ data: FAQS.map((f, i) => ({ ...f, order: i })) });
