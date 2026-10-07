@@ -1,7 +1,8 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { getClient, AI_MODEL, FALLBACK_BETA, LEVEL_GUIDE, MATH_FORMAT_RULES } from "./client";
+import { getClient, AI_MODEL, FALLBACK_BETA, LEVEL_GUIDE, MATH_FORMAT_RULES, aiProvider } from "./client";
+import { geminiStream, geminiUsage, GEMINI_BLOCKED, GEMINI_MODEL, type GeminiContent, type GeminiPart } from "./gemini";
 import { solve } from "../math/engine";
 
 export type TutorMode = "chat" | "explain-step" | "simplify" | "hint" | "another-method" | "examples" | "practice" | "check-work" | "teach";
@@ -53,8 +54,38 @@ ${MATH_FORMAT_RULES}
 Current mode: ${MODE_INSTRUCTIONS[mode]}${context ? `\n\nThe student is looking at this solved problem (verified by the engine):\n<context>\n${context.slice(0, 6000)}\n</context>` : ""}`;
 }
 
+const REFUSAL_TEXT = "\n\nI can't help with that request. Let's get back to math — what would you like to work on?";
+
+/** Runs the math engine for a solve_math tool call. */
+async function runSolveTool(input: unknown): Promise<{ event?: TutorEvent; content: string; isError: boolean }> {
+  const parsed = SolveInput.safeParse(input);
+  if (!parsed.success) return { content: "INVALID_INPUT: provide {\"problem\": string}", isError: true };
+  try {
+    const r = await solve(parsed.data.problem, { includeSimilar: false });
+    return {
+      event: { type: "tool", problem: parsed.data.problem, answer: r.answer.text },
+      content: JSON.stringify({
+        interpreted: r.interpreted,
+        answer: r.answer.text,
+        answer_latex: r.answer.latex,
+        verification: r.verification.status,
+        steps: r.steps.slice(0, 12).map((s) => `${s.title}: ${s.latex ?? s.text ?? ""}`),
+      }),
+      isError: false,
+    };
+  } catch (e) {
+    return { event: { type: "tool", problem: parsed.data.problem, error: (e as Error).message }, content: (e as Error).message, isError: true };
+  }
+}
+
+type TutorOptions = { level: string; mode: TutorMode; context?: string; signal?: AbortSignal };
+
 /** Streams a tutor reply, running the math engine for any tool calls (agentic loop, max 5 rounds). */
-export async function* tutorStream(history: TutorMessage[], opts: { level: string; mode: TutorMode; context?: string; signal?: AbortSignal }): AsyncGenerator<TutorEvent> {
+export async function* tutorStream(history: TutorMessage[], opts: TutorOptions): AsyncGenerator<TutorEvent> {
+  if (aiProvider() === "gemini") {
+    yield* geminiTutorStream(history, opts);
+    return;
+  }
   const client = getClient();
   const messages: Anthropic.Beta.BetaMessageParam[] = history.map((m) => ({ role: m.role, content: m.content }));
   let inputTokens = 0;
@@ -84,7 +115,7 @@ export async function* tutorStream(history: TutorMessage[], opts: { level: strin
     outputTokens += final.usage.output_tokens;
     model = final.model;
     if (final.stop_reason === "refusal") {
-      yield { type: "text", text: "\n\nI can't help with that request. Let's get back to math — what would you like to work on?" };
+      yield { type: "text", text: REFUSAL_TEXT };
       break;
     }
     if (final.stop_reason === "max_tokens") break;
@@ -95,31 +126,76 @@ export async function* tutorStream(history: TutorMessage[], opts: { level: strin
     const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
     for (const block of final.content) {
       if (block.type !== "tool_use") continue;
-      const parsed = SolveInput.safeParse(block.input);
-      if (!parsed.success) {
-        results.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "INVALID_INPUT: provide {\"problem\": string}" });
-        continue;
-      }
-      try {
-        const r = await solve(parsed.data.problem, { includeSimilar: false });
-        yield { type: "tool", problem: parsed.data.problem, answer: r.answer.text };
-        results.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: JSON.stringify({
-            interpreted: r.interpreted,
-            answer: r.answer.text,
-            answer_latex: r.answer.latex,
-            verification: r.verification.status,
-            steps: r.steps.slice(0, 12).map((s) => `${s.title}: ${s.latex ?? s.text ?? ""}`),
-          }),
-        });
-      } catch (e) {
-        yield { type: "tool", problem: parsed.data.problem, error: (e as Error).message };
-        results.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: (e as Error).message });
-      }
+      const r = await runSolveTool(block.input);
+      if (r.event) yield r.event;
+      results.push({ type: "tool_result", tool_use_id: block.id, content: r.content, ...(r.isError ? { is_error: true } : {}) });
     }
     messages.push({ role: "user", content: results });
+  }
+  yield { type: "done", usage: { input: inputTokens, output: outputTokens, model } };
+}
+
+const geminiSolveTool = {
+  functionDeclarations: [
+    {
+      name: solveTool.name,
+      description: solveTool.description,
+      parameters: { type: "OBJECT", properties: { problem: { type: "STRING", description: "The math problem in plain solver syntax" } }, required: ["problem"] },
+    },
+  ],
+};
+
+async function* geminiTutorStream(history: TutorMessage[], opts: TutorOptions): AsyncGenerator<TutorEvent> {
+  const contents: GeminiContent[] = history.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let model = GEMINI_MODEL;
+  const system = systemPrompt(opts.level, opts.mode, opts.context);
+
+  for (let round = 0; round < 5; round++) {
+    // Keep every part the model returns (including thought signatures) for the next round.
+    const modelParts: GeminiPart[] = [];
+    let finish: string | undefined;
+    let blocked = false;
+    let last: Parameters<typeof geminiUsage>[0];
+    for await (const chunk of geminiStream(
+      { systemInstruction: { parts: [{ text: system }] }, contents, tools: [geminiSolveTool], generationConfig: { maxOutputTokens: 16000 } },
+      opts.signal,
+    )) {
+      if (chunk.promptFeedback?.blockReason) blocked = true;
+      const candidate = chunk.candidates?.[0];
+      for (const part of candidate?.content?.parts ?? []) {
+        modelParts.push(part);
+        if ("text" in part && part.text && !part.thought) yield { type: "text", text: part.text };
+      }
+      if (candidate?.finishReason) finish = candidate.finishReason;
+      if (chunk.usageMetadata) last = chunk;
+    }
+    const usage = geminiUsage(last);
+    inputTokens += usage.input;
+    outputTokens += usage.output;
+    model = usage.model;
+    if (blocked || (finish && GEMINI_BLOCKED.has(finish))) {
+      yield { type: "text", text: REFUSAL_TEXT };
+      break;
+    }
+    const calls = modelParts.filter((p): p is Extract<GeminiPart, { functionCall: unknown }> => "functionCall" in p);
+    if (calls.length === 0 || finish === "MAX_TOKENS") break;
+
+    contents.push({ role: "model", parts: modelParts });
+    const responses: GeminiPart[] = [];
+    for (const { functionCall } of calls) {
+      const r = functionCall.name === solveTool.name ? await runSolveTool(functionCall.args) : { content: `Unknown tool ${functionCall.name}`, isError: true };
+      if ("event" in r && r.event) yield r.event;
+      responses.push({
+        functionResponse: {
+          name: functionCall.name,
+          ...(functionCall.id ? { id: functionCall.id } : {}),
+          response: r.isError ? { error: r.content } : { result: r.content },
+        },
+      });
+    }
+    contents.push({ role: "user", parts: responses });
   }
   yield { type: "done", usage: { input: inputTokens, output: outputTokens, model } };
 }

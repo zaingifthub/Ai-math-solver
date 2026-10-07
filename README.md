@@ -33,7 +33,7 @@ SEED_ADMIN_PASSWORD='choose-a-strong-password' npm run db:seed   # content + adm
 npm run dev                     # http://localhost:3000
 ```
 
-Without `ANTHROPIC_API_KEY` the solver, calculators, graphing and practice work fully; AI explanations, the tutor, photo OCR and word problems are disabled gracefully.
+AI runs on Anthropic Claude (`ANTHROPIC_API_KEY`) or, if that is empty, Google Gemini (`GEMINI_API_KEY`). Without either key the solver, calculators, graphing and practice work fully; AI explanations, the tutor, photo OCR and word problems are disabled gracefully.
 
 ## Scripts
 

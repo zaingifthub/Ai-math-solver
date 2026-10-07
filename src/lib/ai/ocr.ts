@@ -1,7 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { getClient, AI_MODEL, FALLBACK_BETA } from "./client";
+import { generateStructured } from "./structured";
 
 const OcrSchema = z.object({
   contains_math: z.boolean(),
@@ -26,29 +25,18 @@ const SYSTEM = `You are a precise math OCR system. Transcribe math problems from
 - Lower the confidence for any symbol you had to guess.`;
 
 export async function extractMathFromImage(base64: string, mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"): Promise<OcrResult | null> {
-  const client = getClient();
-  const response = await client.beta.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 3000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "low", format: betaZodOutputFormat(OcrSchema) },
+  const response = await generateStructured({
     system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-          { type: "text", text: "Transcribe the math problem(s) in this image." },
-        ],
-      },
-    ],
+    text: "Transcribe the math problem(s) in this image.",
+    image: { base64, mediaType },
+    schema: OcrSchema,
+    maxTokens: 3000,
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) return null;
-  const out = response.parsed_output;
+  if (!response) return null;
+  const out = response.data;
   return {
     ...out,
     problems: out.problems.slice(0, 5).map((p) => ({ ...p, confidence: Math.max(0, Math.min(1, p.confidence)) })),
-    usage: { input: response.usage.input_tokens, output: response.usage.output_tokens, model: response.model },
+    usage: response.usage,
   };
 }

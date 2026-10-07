@@ -58,6 +58,8 @@ nano .env
 | `ADMIN_EMAILS` | ✅ | Emails promoted to admin |
 | `ANTHROPIC_API_KEY` | recommended | Enables AI explanations, tutor, photo OCR, word problems |
 | `AI_MODEL` | – | Default `claude-opus-5-5` |
+| `GEMINI_API_KEY` | – | Alternative to Anthropic: Google Gemini key from https://aistudio.google.com/apikey. Used when `ANTHROPIC_API_KEY` is empty |
+| `GEMINI_MODEL` | – | Default `gemini-flash-latest` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | – | Google login. Redirect URI: `https://yourdomain.com/api/auth/callback/google` |
 | `UPLOAD_DIR` | – | Default `./storage/uploads` (use an absolute path, e.g. `/var/www/ai-math-solver/storage/uploads`) |
 | `CRON_SECRET` | ✅ | Random string for the cleanup endpoint |

@@ -49,7 +49,9 @@ export async function runSystemChecks(): Promise<SystemCheck[]> {
   }
 
   // Integrations
-  add("AI", "Anthropic API", e.ANTHROPIC_API_KEY ? "ok" : "warn", e.ANTHROPIC_API_KEY ? `Model ${e.AI_MODEL || "claude-opus-5-5"}.` : "ANTHROPIC_API_KEY missing — AI explanations, tutor, photo scanning and word problems are disabled.");
+  if (e.ANTHROPIC_API_KEY) add("AI", "AI provider", "ok", `Anthropic Claude, model ${e.AI_MODEL || "claude-opus-5-5"}.`);
+  else if (e.GEMINI_API_KEY) add("AI", "AI provider", "ok", `Google Gemini, model ${e.GEMINI_MODEL || "gemini-flash-latest"}.`);
+  else add("AI", "AI provider", "warn", "No AI key — set ANTHROPIC_API_KEY or GEMINI_API_KEY to enable AI explanations, tutor, photo scanning and word problems.");
   const stripeReady = e.STRIPE_SECRET_KEY && e.STRIPE_WEBHOOK_SECRET && e.STRIPE_PRICE_PREMIUM_MONTHLY;
   add("Billing", "Stripe", stripeReady ? "ok" : "warn", stripeReady ? `${e.STRIPE_SECRET_KEY!.startsWith("sk_live") ? "Live" : "Test"} mode.` : "Billing not fully configured (secret key, webhook secret and price IDs are required).");
   if (e.STRIPE_SECRET_KEY?.startsWith("sk_test") && prod && site.startsWith("https://")) add("Billing", "Stripe mode", "warn", "Using Stripe TEST keys in production.");

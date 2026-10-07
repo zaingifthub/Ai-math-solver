@@ -18,4 +18,4 @@
 
 ### Minimum variables for a preview
 
-`NEXTAUTH_SECRET` alone is enough to preview the public site (solver, calculators, graphing, formulas, blog, practice). Accounts, history and the admin panel additionally need `DATABASE_URL` (+ migrations); AI features need `ANTHROPIC_API_KEY`. Missing pieces degrade gracefully and are explained on the login page.
+`NEXTAUTH_SECRET` alone is enough to preview the public site (solver, calculators, graphing, formulas, blog, practice). Accounts, history and the admin panel additionally need `DATABASE_URL` (+ migrations); AI features need `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`. Missing pieces degrade gracefully and are explained on the login page.

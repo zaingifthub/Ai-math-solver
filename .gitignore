@@ -157,3 +157,4 @@ next-env.d.ts
 audit/node_modules/
 audit/screenshots/
 audit/requests.jsonl
+audit/gemini-requests.jsonl
