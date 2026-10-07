@@ -1,7 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { getClient, AI_MODEL, FALLBACK_BETA } from "./client";
+import { generateStructured } from "./structured";
 
 const TranslationSchema = z.object({
   solvable: z.boolean().describe("false if this is not a math problem or lacks the information needed"),
@@ -25,20 +24,7 @@ The engine accepts exactly one of these forms (use * for multiplication, ^ for p
 Choose the variable names x, y, z. Keep numbers exactly as given. If the question asks for a quantity that is a direct arithmetic result, give the arithmetic expression.`;
 
 export async function translateWordProblem(text: string): Promise<{ input: string; setup: string; usage: { input: number; output: number; model: string } } | null> {
-  const client = getClient();
-  const response = await client.beta.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 2000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "low", format: betaZodOutputFormat(TranslationSchema) },
-    system: SYSTEM,
-    messages: [{ role: "user", content: `<word_problem>\n${text}\n</word_problem>` }],
-  });
-  if (response.stop_reason === "refusal" || !response.parsed_output?.solvable || !response.parsed_output.engine_input.trim()) return null;
-  return {
-    input: response.parsed_output.engine_input.trim(),
-    setup: response.parsed_output.setup,
-    usage: { input: response.usage.input_tokens, output: response.usage.output_tokens, model: response.model },
-  };
+  const response = await generateStructured({ system: SYSTEM, text: `<word_problem>\n${text}\n</word_problem>`, schema: TranslationSchema, maxTokens: 2000 });
+  if (!response?.data.solvable || !response.data.engine_input.trim()) return null;
+  return { input: response.data.engine_input.trim(), setup: response.data.setup, usage: response.usage };
 }

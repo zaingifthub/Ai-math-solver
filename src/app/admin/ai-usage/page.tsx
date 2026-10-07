@@ -4,7 +4,7 @@ import { getCurrentUser, hasRole } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/misc";
 import { features } from "@/lib/env";
-import { AI_MODEL } from "@/lib/ai/client";
+import { ACTIVE_MODEL } from "@/lib/ai/client";
 import { daysAgo } from "@/lib/time";
 
 export default async function AiUsagePage() {
@@ -22,7 +22,7 @@ export default async function AiUsagePage() {
       <h1 className="text-2xl font-semibold tracking-tight">AI usage</h1>
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-5"><p className="text-sm text-muted-foreground">AI status</p><p className="mt-1 text-lg font-semibold">{features.ai ? "Enabled" : "Disabled"}</p></Card>
-        <Card className="p-5"><p className="text-sm text-muted-foreground">Model</p><p className="mt-1 font-mono text-lg font-semibold">{AI_MODEL}</p></Card>
+        <Card className="p-5"><p className="text-sm text-muted-foreground">Model</p><p className="mt-1 font-mono text-lg font-semibold">{ACTIVE_MODEL}</p></Card>
         <Card className="p-5"><p className="text-sm text-muted-foreground">Failed requests (30d)</p><p className="mt-1 text-lg font-semibold">{failures}</p></Card>
       </div>
       <Card>

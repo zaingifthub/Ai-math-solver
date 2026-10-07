@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "mathjs"],
+    // Shared hosts (e.g. Hostinger web apps) cap processes and memory: build with a single worker there.
+    ...(process.env.VERCEL ? {} : { cpus: 1, workerThreads: false }),
   },
   async headers() {
     return [

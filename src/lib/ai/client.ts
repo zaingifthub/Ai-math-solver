@@ -1,8 +1,19 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "../env";
+import { GeminiError, GEMINI_MODEL } from "./gemini";
+
+/** Claude is used when ANTHROPIC_API_KEY is set; otherwise Google Gemini when GEMINI_API_KEY is set. */
+export function aiProvider(): "anthropic" | "gemini" | null {
+  if (env.ANTHROPIC_API_KEY) return "anthropic";
+  if (env.GEMINI_API_KEY) return "gemini";
+  return null;
+}
 
 export const AI_MODEL = env.AI_MODEL || "claude-opus-5-5";
+
+/** The model answering requests, for display and usage records. */
+export const ACTIVE_MODEL = aiProvider() === "gemini" ? GEMINI_MODEL : AI_MODEL;
 
 /**
  * Server-side refusal fallback: if a safety classifier declines a request,
@@ -13,7 +24,7 @@ export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const globalForAI = globalThis as unknown as { __anthropic?: Anthropic };
 
 export function aiEnabled() {
-  return Boolean(env.ANTHROPIC_API_KEY);
+  return aiProvider() !== null;
 }
 
 export function getClient(): Anthropic {
@@ -30,6 +41,13 @@ export const LEVEL_GUIDE: Record<string, string> = {
 };
 
 export function describeAIError(e: unknown): string {
+  if (e instanceof GeminiError) {
+    if (e.status === 429) return "The AI service is busy right now. Please try again in a moment.";
+    if (e.status === 401 || e.status === 403) return "AI service authentication failed. Please contact support.";
+    if (e.status === 400) return "The AI could not process this request.";
+    if (e.status === 0) return "Could not reach the AI service. Please try again.";
+    return "The AI service returned an error. Please try again.";
+  }
   if (e instanceof Anthropic.RateLimitError) return "The AI service is busy right now. Please try again in a moment.";
   if (e instanceof Anthropic.AuthenticationError) return "AI service authentication failed. Please contact support.";
   if (e instanceof Anthropic.BadRequestError) return "The AI could not process this request.";

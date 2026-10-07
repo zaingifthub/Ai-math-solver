@@ -11,6 +11,9 @@ const schema = z.object({
   ADMIN_EMAILS: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   AI_MODEL: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().optional(),
+  GEMINI_BASE_URL: z.string().optional(),
   UPLOAD_DIR: z.string().default("./storage/uploads"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
   UPLOAD_TTL_HOURS: z.coerce.number().positive().default(24),
@@ -34,7 +37,7 @@ export const adminEmails = (env.ADMIN_EMAILS ?? "")
   .filter(Boolean);
 
 export const features = {
-  ai: Boolean(env.ANTHROPIC_API_KEY),
+  ai: Boolean(env.ANTHROPIC_API_KEY || env.GEMINI_API_KEY),
   google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
   stripe: Boolean(env.STRIPE_SECRET_KEY),
   database: Boolean(env.DATABASE_URL),
