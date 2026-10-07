@@ -9,8 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
-    "prestart": "(prisma migrate deploy && tsx prisma/seed.ts || echo 'Database setup skipped') && (test -f .next/BUILD_ID || npm run build)",
-    "start": "next start",
+    "start": "if [ -f .next/BUILD_ID ]; then npm run db:setup; next start; else npm run db:setup && npm run build; fi",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -18,6 +17,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:setup": "prisma migrate deploy && tsx prisma/seed.ts || echo 'Database setup skipped'",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "cleanup:uploads": "tsx scripts/cleanup-uploads.ts",
