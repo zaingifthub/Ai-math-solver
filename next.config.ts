@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { isIndexingDisabled } from "./src/lib/indexing";
 
 const isProd = process.env.NODE_ENV === "production";
 const isHttps = (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://");
@@ -27,6 +28,8 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(self)" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Keeps temporary/preview domains out of search results (see src/lib/indexing.ts).
+  ...(isIndexingDisabled() ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] : []),
   ...(isProd && isHttps ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
 ];
 

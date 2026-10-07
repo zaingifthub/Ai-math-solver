@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { siteConfig, absoluteUrl } from "./site";
+import { isIndexingDisabled } from "./indexing";
 
 interface SeoInput {
   title: string;
@@ -48,7 +49,7 @@ export function buildMetadata(input: SeoInput): Metadata {
       ...(i.publishedTime ? { publishedTime: i.publishedTime, modifiedTime: i.modifiedTime } : {}),
     },
     twitter: { card: "summary_large_image", title: i.title, description: i.description, images: [image], site: siteConfig.twitter },
-    robots: i.noindex ? { index: false, follow: true } : { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+    robots: i.noindex || isIndexingDisabled() ? { index: false, follow: true } : { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   };
 }
 
